@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "autobass"
+version = "0.1.0"
+description = "YouTube audio to bass TAB transcription CLI tool"
+requires-python = ">=3.11"
+dependencies = [
+    "loguru>=0.7",
+    "pretty-midi>=0.2.10",
+]
+
+[project.optional-dependencies]
+pipeline = [
+    "yt-dlp>=2024.0",
+    "demucs>=4.0",
+    "basic-pitch>=0.3",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+autobass = "main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
