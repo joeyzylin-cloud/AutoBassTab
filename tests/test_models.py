@@ -22,12 +22,16 @@ class TestFretPosition:
         assert pos.fret == 24
 
     def test_string_number_too_low(self) -> None:
-        with pytest.raises(ValueError, match="string_number must be 1-4"):
+        with pytest.raises(ValueError, match="string_number must be 1-5"):
             FretPosition(string_number=0, fret=5)
 
+    def test_string_5_valid(self) -> None:
+        pos = FretPosition(string_number=5, fret=0)
+        assert pos.string_number == 5
+
     def test_string_number_too_high(self) -> None:
-        with pytest.raises(ValueError, match="string_number must be 1-4"):
-            FretPosition(string_number=5, fret=5)
+        with pytest.raises(ValueError, match="string_number must be 1-5"):
+            FretPosition(string_number=6, fret=5)
 
     def test_fret_negative(self) -> None:
         with pytest.raises(ValueError, match="fret must be 0-24"):
@@ -45,26 +49,33 @@ class TestBassConfigMidiToPositions:
         self.bass = BassConfig()
 
     def test_open_e_string(self) -> None:
-        """MIDI 28 = open E string only."""
+        """MIDI 28 = open E (or B string fret 5)."""
         positions = self.bass.midi_to_positions(28)
-        assert positions == [FretPosition(string_number=4, fret=0)]
+        assert FretPosition(string_number=4, fret=0) in positions
+        assert FretPosition(string_number=5, fret=5) in positions
 
     def test_open_a_string(self) -> None:
-        """MIDI 33 = open A (or E string fret 5)."""
+        """MIDI 33 = open A, E fret 5, B fret 10."""
         positions = self.bass.midi_to_positions(33)
         assert FretPosition(string_number=3, fret=0) in positions
         assert FretPosition(string_number=4, fret=5) in positions
+        assert FretPosition(string_number=5, fret=10) in positions
 
-    def test_multiple_positions_e3(self) -> None:
-        """MIDI 52 (E3) should have 4 positions on standard bass."""
-        positions = self.bass.midi_to_positions(52)
+    def test_multiple_positions_e2(self) -> None:
+        """MIDI 40 (E2) should have positions on all 5 strings."""
+        positions = self.bass.midi_to_positions(40)
         expected = [
-            FretPosition(string_number=1, fret=9),   # G string
-            FretPosition(string_number=2, fret=14),   # D string
-            FretPosition(string_number=3, fret=19),   # A string
-            FretPosition(string_number=4, fret=24),   # E string
+            FretPosition(string_number=2, fret=2),    # D string
+            FretPosition(string_number=3, fret=7),    # A string
+            FretPosition(string_number=4, fret=12),   # E string
+            FretPosition(string_number=5, fret=17),   # B string
         ]
         assert positions == expected
+
+    def test_open_b_string(self) -> None:
+        """MIDI 23 = open B string only."""
+        positions = self.bass.midi_to_positions(23)
+        assert positions == [FretPosition(string_number=5, fret=0)]
 
     def test_sorted_by_fret_then_string(self) -> None:
         """Positions should be sorted by (fret, string_number)."""
@@ -73,8 +84,8 @@ class TestBassConfigMidiToPositions:
         assert positions[0].fret <= positions[-1].fret
 
     def test_out_of_range_too_low(self) -> None:
-        """MIDI 27 is below the lowest note (E string open = 28)."""
-        positions = self.bass.midi_to_positions(27)
+        """MIDI 22 is below the lowest note (B string open = 23)."""
+        positions = self.bass.midi_to_positions(22)
         assert positions == []
 
     def test_out_of_range_too_high(self) -> None:

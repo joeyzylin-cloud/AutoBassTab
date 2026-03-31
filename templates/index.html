@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoBassTab</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f0f1a;
+    --surface:   #1a1b2e;
+    --border:    #2d2f50;
+    --accent:    #7c6af7;
+    --accent2:   #e94560;
+    --text:      #e8e8f0;
+    --muted:     #6b6d8a;
+    --success:   #4caf82;
+    --warn:      #f0a830;
+    --log-bg:    #0a0a12;
+    --tab-g:     #7c6af7;
+    --tab-d:     #4caf82;
+    --tab-a:     #f0a830;
+    --tab-e:     #e94560;
+    --tab-b:     #56b6ff;
+    --rhythm:    #f0a830;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .container { max-width: 860px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header h1 { font-size: 2.2rem; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); margin-top: .4rem; font-size: .95rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+  }
+
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .4rem; }
+
+  input[type="url"] {
+    width: 100%; padding: .65rem .9rem;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 1rem;
+    outline: none; transition: border-color .2s;
+  }
+  input[type="url"]:focus { border-color: var(--accent); }
+
+  .row { display: flex; gap: .8rem; margin-top: 1rem; align-items: flex-end; }
+
+  select {
+    padding: .65rem .9rem; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: .9rem; outline: none;
+    cursor: pointer; flex-shrink: 0;
+  }
+  select:focus { border-color: var(--accent); }
+
+  button#btn-generate {
+    flex: 1; padding: .7rem 1.2rem;
+    background: var(--accent); border: none;
+    border-radius: 8px; color: #fff;
+    font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: opacity .2s, transform .1s;
+  }
+  button#btn-generate:hover { opacity: .9; }
+  button#btn-generate:active { transform: scale(.98); }
+  button#btn-generate:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* progress */
+  #progress-area { display: none; }
+
+  .step-bar {
+    display: flex; gap: .5rem; margin-bottom: 1rem;
+    font-size: .8rem; color: var(--muted);
+  }
+  .step {
+    padding: .25rem .7rem; border-radius: 20px;
+    border: 1px solid var(--border);
+    transition: all .3s;
+  }
+  .step.active { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,.1); animation: pulse 1.4s ease-in-out infinite; }
+  .step.done { border-color: var(--success); color: var(--success); background: rgba(76,175,130,.08); }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
+
+  #log-box {
+    background: var(--log-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: .8rem 1rem;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: .78rem; color: #8b9dc3;
+    max-height: 180px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  #log-box .warn  { color: var(--warn); }
+  #log-box .error { color: var(--accent2); }
+
+  /* result */
+  #result-area { display: none; }
+
+  .result-header {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: .8rem;
+  }
+  .result-header h3 { font-size: 1rem; }
+
+  #btn-download {
+    padding: .45rem 1rem;
+    background: transparent; border: 1px solid var(--accent);
+    border-radius: 8px; color: var(--accent); font-size: .85rem;
+    font-weight: 600; cursor: pointer; transition: background .2s;
+    text-decoration: none; display: inline-block;
+  }
+  #btn-download:hover { background: rgba(124,106,247,.15); }
+
+  #tab-display {
+    background: var(--log-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem 1.2rem;
+    font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+    font-size: .82rem; line-height: 1.55;
+    overflow-x: auto; white-space: pre;
+  }
+
+  /* TAB syntax colors */
+  .tab-bpm    { color: var(--accent); font-weight: bold; }
+  .tab-mnum   { color: var(--muted); }
+  .tab-rhythm { color: var(--rhythm); }
+  .tab-prefix { font-weight: bold; }
+  .tab-g      { color: var(--tab-g); }
+  .tab-d      { color: var(--tab-d); }
+  .tab-a      { color: var(--tab-a); }
+  .tab-e      { color: var(--tab-e); }
+  .tab-b      { color: var(--tab-b); }
+  .tab-fret   { color: #e8e8f0; }
+  .tab-dash   { color: #2d2f50; }
+
+  .error-msg { color: var(--accent2); padding: .6rem 0; font-size: .9rem; }
+
+  footer { text-align: center; margin-top: 3rem; color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Auto<span>Bass</span>Tab</h1>
+    <p>YouTube 影片 → Bass TAB 譜 &amp; MusicXML</p>
+  </header>
+
+  <div class="card">
+    <label for="url-input">YouTube URL</label>
+    <input type="url" id="url-input" placeholder="https://www.youtube.com/watch?v=...">
+    <div class="row">
+      <select id="strategy-select">
+        <option value="lowest_position">指法：最低把位</option>
+        <option value="min_movement">指法：最小移動</option>
+        <option value="open_string_prefer">指法：偏好空弦</option>
+      </select>
+      <button id="btn-generate" onclick="generate()">生成 TAB</button>
+    </div>
+  </div>
+
+  <div class="card" id="progress-area">
+    <div class="step-bar">
+      <span class="step" id="step-downloading">下載</span>
+      <span class="step" id="step-separating">音源分離</span>
+      <span class="step" id="step-transcribing">MIDI 轉錄</span>
+      <span class="step" id="step-generating">TAB 生成</span>
+    </div>
+    <div id="log-box"></div>
+    <div id="error-msg" class="error-msg" style="display:none"></div>
+  </div>
+
+  <div class="card" id="result-area">
+    <div class="result-header">
+      <h3>Bass TAB</h3>
+      <a id="btn-download" href="#">下載 MusicXML</a>
+    </div>
+    <div id="tab-display"></div>
+  </div>
+
+</div>
+<footer>AutoBassTab &mdash; yt-dlp · Demucs · basic-pitch · Python 3.11</footer>
+
+<script>
+const STEPS = ['downloading', 'separating', 'transcribing', 'generating'];
+
+function setStep(name) {
+  const idx = STEPS.indexOf(name);
+  STEPS.forEach((s, i) => {
+    const el = document.getElementById('step-' + s);
+    if (i < idx)       el.className = 'step done';
+    else if (i === idx) el.className = 'step active';
+    else                el.className = 'step';
+  });
+}
+
+function appendLog(msg) {
+  const box = document.getElementById('log-box');
+  const line = document.createElement('span');
+  if (/^(ERROR|CRITICAL)/i.test(msg))  line.className = 'error';
+  else if (/^WARNING/i.test(msg))      line.className = 'warn';
+  line.textContent = msg + '\n';
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Very simple TAB syntax highlighter
+function highlightTab(raw) {
+  const STRING_COLORS = { G: 'tab-g', D: 'tab-d', A: 'tab-a', E: 'tab-e', B: 'tab-b' };
+  return raw.split('\n').map(line => {
+    if (!line) return '';
+
+    // BPM header: ♩=120
+    if (/^♩=/.test(line)) return `<span class="tab-bpm">${esc(line)}</span>`;
+
+    // Measure number line:  | 1   | 2 ...
+    if (/^ \| \d/.test(line)) return `<span class="tab-mnum">${esc(line)}</span>`;
+
+    // Rhythm line:  | Hr   E.  ...
+    if (/^ \|/.test(line)) return `<span class="tab-rhythm">${esc(line)}</span>`;
+
+    // TAB string line: G|--- or D|---
+    const m = line.match(/^([GDAEB])(\|.*)$/);
+    if (m) {
+      const cls = STRING_COLORS[m[1]] || 'tab-fret';
+      // Single-pass replacement to avoid second regex matching inside span tags
+      const rest = m[2].replace(/(\d+)|(-+)/g, (_, digits, dashes) =>
+        digits ? `<span class="tab-fret">${digits}</span>`
+               : `<span class="tab-dash">${dashes}</span>`
+      );
+      return `<span class="${cls} tab-prefix">${esc(m[1])}</span>${rest}`;
+    }
+
+    return esc(line);
+  }).join('\n');
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let currentJobId = null;
+let currentSource = null;
+
+async function generate() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) { alert('請輸入 YouTube URL'); return; }
+
+  const strategy = document.getElementById('strategy-select').value;
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+
+  // Reset UI
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('result-area').style.display = 'none';
+  document.getElementById('progress-area').style.display = 'block';
+  STEPS.forEach(s => document.getElementById('step-' + s).className = 'step');
+
+  if (currentSource) { currentSource.close(); currentSource = null; }
+
+  // Start job
+  const res = await fetch('/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url, strategy })
+  });
+  const data = await res.json();
+  if (data.error) {
+    showError(data.error);
+    btn.disabled = false;
+    return;
+  }
+
+  currentJobId = data.job_id;
+
+  // Subscribe to SSE
+  currentSource = new EventSource('/stream/' + currentJobId);
+  currentSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'step')  setStep(msg.step);
+    if (msg.type === 'log')   appendLog(msg.msg);
+
+    if (msg.type === 'done') {
+      STEPS.forEach(s => document.getElementById('step-' + s).className = 'step done');
+      showResult(msg.tab, msg.job_id);
+      btn.disabled = false;
+      currentSource.close();
+    }
+
+    if (msg.type === 'error') {
+      showError(msg.msg);
+      btn.disabled = false;
+      currentSource.close();
+    }
+  };
+  currentSource.onerror = () => {
+    appendLog('ERROR: 連線中斷');
+    btn.disabled = false;
+  };
+}
+
+function showResult(tab, jobId) {
+  const area = document.getElementById('result-area');
+  document.getElementById('tab-display').innerHTML = highlightTab(tab);
+  document.getElementById('btn-download').href = '/download/' + jobId;
+  area.style.display = 'block';
+  area.scrollIntoView({ behavior: 'smooth' });
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = '錯誤：' + msg;
+  el.style.display = 'block';
+}
+
+// Allow Enter key in URL field
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generate();
+});
+</script>
+</body>
+</html>

@@ -140,8 +140,8 @@ def main(argv: list[str] | None = None) -> None:
     tab_file.write_text(tab_output, encoding="utf-8")
     logger.info("TAB written to: {}", tab_file)
 
-    sys.stdout.write(tab_output)
-    sys.stdout.write("\n")
+    sys.stdout.buffer.write(tab_output.encode("utf-8"))
+    sys.stdout.buffer.write(b"\n")
 
 
 if __name__ == "__main__":

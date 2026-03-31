@@ -22,7 +22,7 @@ def download_audio(config: DownloadConfig) -> Path:
         DownloadError: If yt-dlp is not installed or download fails.
     """
     try:
-        import yt_dlp  # noqa: F401
+        import yt_dlp
     except ImportError as e:
         raise DownloadError(
             "yt-dlp is not installed. "
@@ -33,7 +33,33 @@ def download_audio(config: DownloadConfig) -> Path:
     output_path = config.output_dir / "audio_full.wav"
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
-    raise NotImplementedError(
-        "download_audio() is a stub. "
-        "Use /implement download_audio to generate the full implementation."
-    )
+    ydl_opts: dict = {
+        "format": "bestaudio/best",
+        "outtmpl": str(config.output_dir / "audio_full.%(ext)s"),
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": config.audio_format,
+                "preferredquality": "0",
+            }
+        ],
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            logger.info("Extracting audio from YouTube...")
+            ydl.download([config.url])
+    except yt_dlp.utils.DownloadError as e:
+        raise DownloadError(f"Failed to download: {e}") from e
+    except Exception as e:
+        raise DownloadError(f"Unexpected error during download: {e}") from e
+
+    if not output_path.exists():
+        raise DownloadError(
+            f"Download completed but output file not found: {output_path}"
+        )
+
+    logger.info("Audio saved to: {} ({:.1f} MB)", output_path, output_path.stat().st_size / 1e6)
+    return output_path
