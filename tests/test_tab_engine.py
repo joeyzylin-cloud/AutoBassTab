@@ -1,5 +1,8 @@
 """Tests for the TAB engine module."""
 
+from pathlib import Path
+
+import pretty_midi
 import pytest
 
 from src.models import (
@@ -11,9 +14,12 @@ from src.models import (
     TabEngineError,
 )
 from src.tab_engine import (
+    _decompose_duration,
     _snap_rhythm,
     assign_positions,
+    detect_bpm,
     format_tab,
+    load_midi_notes,
 )
 
 
@@ -286,6 +292,7 @@ class TestFormatTab:
         assert "r" in result  # rest symbol present
 
     def test_rhythm_and_tab_alignment(self) -> None:
+
         """Rhythm line and TAB lines have same width between | delimiters."""
         assigned = [
             _assigned(3, 0, 0.0, 0.5),
@@ -301,3 +308,118 @@ class TestFormatTab:
             # All bar-containing lines should have same length
             lengths = [len(l) for l in bar_lines]
             assert len(set(lengths)) == 1, f"Misaligned lines: {lengths}"
+
+
+# ===========================================================================
+# _decompose_duration tests
+# ===========================================================================
+
+class TestDecomposeDuration:
+    """Tests for _decompose_duration()."""
+
+    def test_quarter_returns_single_q(self) -> None:
+        """1.0 beat decomposes to a single quarter note."""
+        parts = _decompose_duration(1.0)
+        assert parts == [("Q", 1.0)]
+
+    def test_dotted_half_returns_single_h_dot(self) -> None:
+        """3.0 beats decomposes to a single dotted half note."""
+        parts = _decompose_duration(3.0)
+        assert parts == [("H.", 3.0)]
+
+    def test_two_and_half_beats_sums_correctly(self) -> None:
+        """2.5 beats decomposes to parts that sum back to 2.5."""
+        parts = _decompose_duration(2.5)
+        total = sum(v for _, v in parts)
+        assert abs(total - 2.5) < 0.01
+
+    def test_very_small_returns_sixteenth(self) -> None:
+        """Input below the loop threshold returns at least a sixteenth note."""
+        parts = _decompose_duration(0.05)
+        assert parts == [("S", 0.25)]
+
+    def test_always_returns_nonempty(self) -> None:
+        """Result is never empty for any positive input."""
+        for beats in [0.25, 0.5, 1.0, 2.0, 3.5, 4.0]:
+            assert len(_decompose_duration(beats)) > 0
+
+
+# ===========================================================================
+# detect_bpm tests
+# ===========================================================================
+
+def _write_midi(tmp_path: Path, bpm: float | None = None) -> Path:
+    """Write a minimal MIDI file and return its path."""
+    mid = pretty_midi.PrettyMIDI(initial_tempo=bpm if bpm else 120.0)
+    inst = pretty_midi.Instrument(program=33)  # electric bass
+    inst.notes.append(pretty_midi.Note(velocity=80, pitch=40, start=0.0, end=0.5))
+    mid.instruments.append(inst)
+    path = tmp_path / "test.mid"
+    mid.write(str(path))
+    return path
+
+
+class TestDetectBpm:
+    """Tests for detect_bpm()."""
+
+    def test_reads_explicit_tempo(self, tmp_path: Path) -> None:
+        """Reads the tempo embedded in a MIDI file."""
+        path = _write_midi(tmp_path, bpm=140.0)
+        result = detect_bpm(path)
+        assert abs(result - 140.0) < 1.0
+
+    def test_returns_120_for_missing_file(self, tmp_path: Path) -> None:
+        """Returns 120.0 gracefully when file does not exist."""
+        result = detect_bpm(tmp_path / "nonexistent.mid")
+        assert result == 120.0
+
+
+# ===========================================================================
+# load_midi_notes tests
+# ===========================================================================
+
+class TestLoadMidiNotes:
+    """Tests for load_midi_notes()."""
+
+    def test_file_not_found_raises(self, tmp_path: Path) -> None:
+        """Raises TabEngineError when MIDI file is missing."""
+        with pytest.raises(TabEngineError, match="not found"):
+            load_midi_notes(tmp_path / "missing.mid")
+
+    def test_empty_midi_returns_empty_list(self, tmp_path: Path) -> None:
+        """MIDI file with no notes returns an empty list."""
+        mid = pretty_midi.PrettyMIDI()
+        path = tmp_path / "empty.mid"
+        mid.write(str(path))
+        assert load_midi_notes(path) == []
+
+    def test_drum_track_excluded(self, tmp_path: Path) -> None:
+        """Notes on a drum instrument are excluded from results."""
+        mid = pretty_midi.PrettyMIDI()
+        drum = pretty_midi.Instrument(program=0, is_drum=True)
+        drum.notes.append(pretty_midi.Note(velocity=100, pitch=36, start=0.0, end=0.1))
+        mid.instruments.append(drum)
+        path = tmp_path / "drums.mid"
+        mid.write(str(path))
+        assert load_midi_notes(path) == []
+
+    def test_non_drum_notes_loaded(self, tmp_path: Path) -> None:
+        """Notes on a non-drum instrument are returned."""
+        path = _write_midi(tmp_path, bpm=120.0)
+        notes = load_midi_notes(path)
+        assert len(notes) == 1
+        assert notes[0].midi_pitch == 40
+
+    def test_notes_sorted_by_start_time(self, tmp_path: Path) -> None:
+        """Notes are returned sorted by start_time regardless of insertion order."""
+        mid = pretty_midi.PrettyMIDI()
+        inst = pretty_midi.Instrument(program=33)
+        inst.notes.append(pretty_midi.Note(velocity=80, pitch=33, start=1.0, end=1.5))
+        inst.notes.append(pretty_midi.Note(velocity=80, pitch=40, start=0.0, end=0.5))
+        inst.notes.append(pretty_midi.Note(velocity=80, pitch=38, start=0.5, end=1.0))
+        mid.instruments.append(inst)
+        path = tmp_path / "unsorted.mid"
+        mid.write(str(path))
+        notes = load_midi_notes(path)
+        starts = [n.start_time for n in notes]
+        assert starts == sorted(starts)

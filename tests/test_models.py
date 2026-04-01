@@ -1,8 +1,24 @@
 """Tests for data models."""
 
+from pathlib import Path
+
 import pytest
 
-from src.models import BassConfig, FretPosition, NoteEvent, Strategy
+from src.models import (
+    AssignedNote,
+    BassConfig,
+    DownloadConfig,
+    DownloadError,
+    FretPosition,
+    NoteEvent,
+    SeparationConfig,
+    SeparationError,
+    Strategy,
+    TabConfig,
+    TabEngineError,
+    TranscribeConfig,
+    TranscribeError,
+)
 
 
 class TestFretPosition:
@@ -106,3 +122,109 @@ class TestStrategy:
         assert Strategy.LOWEST_POSITION.value == "lowest_position"
         assert Strategy.MIN_MOVEMENT.value == "min_movement"
         assert Strategy.OPEN_STRING_PREFER.value == "open_string_prefer"
+
+
+# ===========================================================================
+# NoteEvent tests
+# ===========================================================================
+
+class TestNoteEvent:
+    """Tests for NoteEvent dataclass."""
+
+    def test_basic_construction(self) -> None:
+        """NoteEvent stores all fields correctly."""
+        note = NoteEvent(midi_pitch=40, start_time=0.0, end_time=0.5, velocity=80)
+        assert note.midi_pitch == 40
+        assert note.start_time == 0.0
+        assert note.end_time == 0.5
+        assert note.velocity == 80
+
+    def test_default_velocity(self) -> None:
+        """Velocity defaults to 100 when not supplied."""
+        note = NoteEvent(midi_pitch=33, start_time=1.0, end_time=1.5)
+        assert note.velocity == 100
+
+    def test_duration(self) -> None:
+        """end_time - start_time gives note duration."""
+        note = NoteEvent(midi_pitch=28, start_time=0.25, end_time=0.75)
+        assert abs((note.end_time - note.start_time) - 0.5) < 1e-9
+
+
+# ===========================================================================
+# AssignedNote tests
+# ===========================================================================
+
+class TestAssignedNote:
+    """Tests for AssignedNote dataclass."""
+
+    def test_basic_construction(self) -> None:
+        """AssignedNote stores event and position."""
+        event = NoteEvent(midi_pitch=40, start_time=0.0, end_time=0.5)
+        position = FretPosition(string_number=2, fret=2)
+        assigned = AssignedNote(event=event, position=position)
+        assert assigned.event == event
+        assert assigned.position == position
+
+
+# ===========================================================================
+# Config dataclass tests
+# ===========================================================================
+
+class TestConfigDataclasses:
+    """Tests for configuration dataclasses."""
+
+    def test_download_config_defaults(self, tmp_path: Path) -> None:
+        """DownloadConfig sets audio_format to 'wav' by default."""
+        cfg = DownloadConfig(url="https://youtu.be/test", output_dir=tmp_path)
+        assert cfg.audio_format == "wav"
+        assert cfg.url == "https://youtu.be/test"
+
+    def test_separation_config_default_model(self, tmp_path: Path) -> None:
+        """SeparationConfig defaults to htdemucs model."""
+        cfg = SeparationConfig(input_path=tmp_path / "audio.wav", output_dir=tmp_path)
+        assert cfg.model_name == "htdemucs"
+
+    def test_transcribe_config_defaults(self, tmp_path: Path) -> None:
+        """TranscribeConfig has correct default thresholds and octave_shift."""
+        cfg = TranscribeConfig(input_path=tmp_path / "bass.wav", output_dir=tmp_path)
+        assert cfg.onset_threshold == 0.5
+        assert cfg.frame_threshold == 0.4
+        assert cfg.octave_shift == 12
+        assert cfg.no_bass_path is None
+
+    def test_tab_config_default_strategy(self, tmp_path: Path) -> None:
+        """TabConfig defaults to LOWEST_POSITION strategy."""
+        cfg = TabConfig(input_path=tmp_path / "bass.mid", output_dir=tmp_path)
+        assert cfg.strategy == Strategy.LOWEST_POSITION
+
+
+# ===========================================================================
+# Custom exception tests
+# ===========================================================================
+
+class TestCustomExceptions:
+    """Tests for custom exception classes."""
+
+    def test_download_error_is_exception(self) -> None:
+        """DownloadError is an Exception subclass with a message."""
+        err = DownloadError("download failed")
+        assert isinstance(err, Exception)
+        assert str(err) == "download failed"
+
+    def test_separation_error(self) -> None:
+        """SeparationError is an Exception subclass."""
+        assert isinstance(SeparationError("sep failed"), Exception)
+
+    def test_transcribe_error(self) -> None:
+        """TranscribeError is an Exception subclass."""
+        assert isinstance(TranscribeError("transcribe failed"), Exception)
+
+    def test_tab_engine_error(self) -> None:
+        """TabEngineError is an Exception subclass."""
+        assert isinstance(TabEngineError("tab failed"), Exception)
+
+    def test_exceptions_can_be_raised_and_caught(self) -> None:
+        """Each custom exception can be raised and caught by its own type."""
+        for exc_cls in (DownloadError, SeparationError, TranscribeError, TabEngineError):
+            with pytest.raises(exc_cls):
+                raise exc_cls("test")
