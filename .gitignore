@@ -6,3 +6,9 @@ dist/
 build/
 .env
 output/
+.venv/
+venv/
+.ruff_cache/
+.idea/
+.vscode/
+.DS_Store

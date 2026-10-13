@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.models import BassConfig, FretPosition, NoteEvent, Strategy
+from src.models import BassConfig, FretPosition, Strategy
 
 
 class TestFretPosition:

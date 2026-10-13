@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "autobass"
 version = "0.1.0"
 description = "YouTube audio to bass TAB transcription CLI tool"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "loguru>=0.7",
@@ -31,6 +32,9 @@ web = [
 dev = [
     "pytest>=8.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/joeyzylin-cloud/AutoBassTab"
 
 [project.scripts]
 autobass = "main:main"

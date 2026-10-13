@@ -157,5 +157,5 @@ def download(job_id: str):
 
 
 if __name__ == "__main__":
-    print("AutoBassTab running at http://localhost:5000")
+    logger.info("AutoBassTab running at http://localhost:5000")
     app.run(debug=False, port=5000, threaded=True)

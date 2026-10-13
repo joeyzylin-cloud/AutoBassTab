@@ -1,14 +1,11 @@
 """Tests for the TAB engine module."""
 
-import pytest
 
 from src.models import (
     AssignedNote,
-    BassConfig,
     FretPosition,
     NoteEvent,
     Strategy,
-    TabEngineError,
 )
 from src.tab_engine import (
     _snap_rhythm,
