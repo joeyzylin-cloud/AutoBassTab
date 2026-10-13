@@ -13,14 +13,14 @@ The pipeline has four stages:
 | 1 | `src/downloader.py` | Downloads the audio from YouTube with **yt-dlp** | `audio_full.wav` |
 | 2 | `src/separator.py` | Splits out the bass with **Demucs** (`htdemucs`, two-stem bass mode) | `bass_only.wav`, `no_bass.wav` |
 | 3 | `src/transcriber.py` | Detects pitches with **basic-pitch** after three preprocessing steps | `bass_track.mid` |
-| 4 | `src/tab_engine.py` | Converts MIDI to TAB, detects BPM, exports MusicXML | `bass_tab.txt`, `bass_tab.xml` |
+| 4 | `src/tab_engine.py` | Converts MIDI to TAB, reads the tempo from the MIDI file, exports MusicXML | `bass_tab.txt`, `bass_tab.xml` |
 
 ### Transcription details
 
 Bass notes are very low, which is hard for pitch detectors. The transcriber works around this in three steps before running basic-pitch:
 
 1. **Low-pass filter** (Butterworth, 500 Hz cutoff) removes non-bass frequencies.
-2. **Sidechain-style ducking** uses the low end of the `no_bass` stem to find kick drum hits and lowers the bass stem at those moments, reducing kick bleed.
+2. **Sidechain-style ducking** uses the low end of the `no_bass` stem to find kick drum hits and lowers the bass stem at those moments, reducing kick bleed. This step runs whenever Demucs ran in the same run (CLI or web), and is skipped with `--skip-separate`.
 3. **Octave-up trick:** the audio is pitch-shifted up 12 semitones, since basic-pitch is more accurate in higher registers. Every detected note is shifted back down 12 semitones afterward.
 
 After transcription, TensorFlow runs in deterministic mode (fixed seed) so repeated runs give the same result, and notes below C2 that sit one semitone above an open string are snapped down to it.
@@ -57,15 +57,15 @@ Rhythm symbols: `W` whole, `H` half, `Q` quarter, `E` eighth, `S` sixteenth, `.`
 - **Python 3.11** (3.12 and newer are not compatible with TensorFlow / basic-pitch)
 - ffmpeg available on your PATH (needed by yt-dlp and Demucs for audio conversion)
 
-Python packages used by the project: `loguru`, `pretty-midi`, `yt-dlp`, `demucs`, `basic-pitch`, `librosa`, `scipy`, `flask` (web UI), and `pytest` (tests).
-
 ## Setup
 
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install loguru pretty-midi yt-dlp demucs basic-pitch librosa scipy flask pytest
+pip install -e ".[pipeline,web,dev]"
 ```
+
+The extras are optional: `pipeline` installs the audio tools (yt-dlp, Demucs, basic-pitch and friends), `web` installs Flask for the web app, and `dev` installs pytest. The base install is enough to turn an existing MIDI file into TAB (use the `--skip-*` flags below).
 
 ## Usage
 
@@ -136,6 +136,7 @@ pytest tests/ -v
 
 ## Limitations
 
+- The tempo is not measured from the song. basic-pitch writes its MIDI at a default 120 BPM, and the TAB engine reads that value back, so bar lines and rhythm symbols are laid out as if every song were at 120 BPM. Pitches and string/fret choices are unaffected, but songs far from 120 BPM will show distorted rhythm labels.
 - Accuracy depends on how cleanly Demucs can isolate the bass; dense mixes and heavy kick drums can still produce wrong or extra notes.
 - Fingering is chosen by simple rules, not by what is comfortable or idiomatic to play, so review the result before relying on it.
 - Only works with audio you are allowed to download and process.

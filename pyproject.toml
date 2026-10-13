@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "autobass"
@@ -13,10 +13,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Full audio pipeline: download -> separate -> transcribe.
+# basic-pitch pulls in TensorFlow, which needs Python 3.11.
 pipeline = [
     "yt-dlp>=2024.0",
     "demucs>=4.0",
     "basic-pitch>=0.3",
+    "librosa>=0.10",
+    "scipy>=1.10",
+    "soundfile>=0.12",
+    "numpy>=1.24",
+]
+# Local web interface (web_app.py); combine with the pipeline extra.
+web = [
+    "flask>=3.0",
 ]
 dev = [
     "pytest>=8.0",
@@ -24,6 +34,10 @@ dev = [
 
 [project.scripts]
 autobass = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "web_app"]
+packages = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -96,6 +96,7 @@ def main(argv: list[str] | None = None) -> None:
         logger.info("Skipping download, using: {}", current_path)
 
     # Module 2: Separate
+    no_bass_path: Path | None = None
     if not args.skip_separate:
         from src.separator import separate_bass
 
@@ -106,9 +107,11 @@ def main(argv: list[str] | None = None) -> None:
         )
         current_path = separate_bass(config)
         logger.info("Separation complete: {}", current_path)
+        # Demucs also writes the no_bass stem, used for kick-drum ducking in Module 3
+        no_bass_path = (
+            output_dir / "separated" / args.demucs_model / config.input_path.stem / "no_bass.wav"
+        )
     else:
-        if not args.skip_download:
-            pass  # current_path already set from download
         logger.info("Skipping separation, using: {}", current_path)
 
     # Module 3: Transcribe
@@ -118,6 +121,7 @@ def main(argv: list[str] | None = None) -> None:
         config = TranscribeConfig(
             input_path=Path(current_path),
             output_dir=output_dir,
+            no_bass_path=no_bass_path if no_bass_path and no_bass_path.exists() else None,
         )
         current_path = transcribe_to_midi(config)
         logger.info("Transcription complete: {}", current_path)
